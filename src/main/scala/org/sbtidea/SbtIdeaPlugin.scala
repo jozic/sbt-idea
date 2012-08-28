@@ -35,8 +35,9 @@ object SbtIdeaPlugin extends Plugin {
   private val SbtClassifiers = "sbt-classifiers"
   private val NoFsc = "no-fsc"
   private val NoTypeHighlighting = "no-type-highlighting"
+  private val NoIgnoreGenerated = "no-ignore-generated"
 
-  private val args = (Space ~> NoClassifiers | Space ~> SbtClassifiers | Space ~> NoFsc | Space ~> NoTypeHighlighting).*
+  private val args = (Space ~> NoClassifiers | Space ~> SbtClassifiers | Space ~> NoFsc | Space ~> NoTypeHighlighting | Space ~> NoIgnoreGenerated).*
 
   private lazy val ideaCommand = Command("gen-idea")(_ => args)(doCommand)
 
@@ -93,7 +94,7 @@ object SbtIdeaPlugin extends Plugin {
     val env = IdeaProjectEnvironment(projectJdkName = SystemProps.jdkName, javaLanguageLevel = SystemProps.languageLevel,
       includeSbtProjectDefinitionModule = true, projectOutputPath = None, excludedFolders = "target",
       compileWithIdea = false, modulePath = ".idea_modules", useProjectFsc = !args.contains(NoFsc),
-      enableTypeHighlighting = !args.contains(NoTypeHighlighting))
+      enableTypeHighlighting = !args.contains(NoTypeHighlighting), ignoreGenerated = !args.contains(NoIgnoreGenerated))
 
     val userEnv = IdeaUserEnvironment(false)
 

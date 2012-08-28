@@ -130,7 +130,8 @@ class IdeaProjectDescriptor(val projectInfo: IdeaProjectInfo, val env: IdeaProje
         "projectCodeStyle.xml" -> Some(defaultProjectCodeStyleXml),
         "encodings.xml" -> Some(defaultEncodingsXml),
         "scala_compiler.xml" -> (if (env.useProjectFsc) Some(scalaCompilerXml) else None),
-        "highlighting.xml" -> (if (env.enableTypeHighlighting) Some(highlightingXml) else None)
+        "highlighting.xml" -> (if (env.enableTypeHighlighting) Some(highlightingXml) else None),
+        "workspace.xml" -> (if (env.ignoreGenerated) Some(workspaceXml) else None)
       ) foreach {
         case (fileName, Some(xmlNode)) if (!configFile(fileName).exists) =>  saveFile(configDir, fileName, xmlNode)
         case _ =>
@@ -162,6 +163,14 @@ class IdeaProjectDescriptor(val projectInfo: IdeaProjectInfo, val env: IdeaProje
       <component name="HighlightingAdvisor">
         <option name="SUGGEST_TYPE_AWARE_HIGHLIGHTING" value="false"/>
         <option name="TYPE_AWARE_HIGHLIGHTING_ENABLED" value="true"/>
+      </component>
+    </project>
+
+  val workspaceXml =
+    <project version="4">
+      <component name="ChangeListManager">
+        <ignored path=".idea/"/>
+        <ignored path=".idea_modules/"/>
       </component>
     </project>
 
