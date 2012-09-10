@@ -11,7 +11,8 @@ import xml.transform.{RewriteRule, RuleTransformer}
 import java.io.{FileOutputStream, File}
 import java.nio.channels.Channels
 import util.control.Exception._
-import xml.{Text, Elem, UnprefixedAttribute, XML, Node, Unparsed}
+import xml.{Text, Elem, XML, Node, Unparsed}
+import org.sbtidea.SupportedVcs.{UnknownVCS, VCS}
 
 object OutputUtil {
   def saveFile(dir: File, filename: String, node: xml.Node) { saveFile(new File(dir, filename), node) }
@@ -19,7 +20,7 @@ object OutputUtil {
   def saveFile(file: File, node: xml.Node) {
     val prettyPrint = new scala.xml.PrettyPrinter(150, 2)
     val fos = new FileOutputStream(file)
-    val w = Channels.newWriter(fos.getChannel(), XML.encoding)
+    val w = Channels.newWriter(fos.getChannel, XML.encoding)
 
     ultimately(w.close())(
       w.write(prettyPrint.format(node))
@@ -40,8 +41,8 @@ class IdeaProjectDescriptor(val projectInfo: IdeaProjectInfo, val env: IdeaProje
     } else path
   }
 
-  val vcsName = List("svn", "Git").foldLeft("") { (res, vcs) =>
-    if (new File(projectInfo.baseDir, "." + vcs.toLowerCase).exists) vcs else res
+  val vcs: VCS = SupportedVcs.list.fold(UnknownVCS) { (res, vcs) =>
+    if (new File(projectInfo.baseDir, "." + vcs.name.toLowerCase).exists) vcs else res
   }
 
   private def moduleEntry(pathPrefix: String, moduleName: String, groupName: Option[String]) =
@@ -106,7 +107,7 @@ class IdeaProjectDescriptor(val projectInfo: IdeaProjectInfo, val env: IdeaProje
 
   private def vcsComponent: xml.Node =
     <component name="VcsDirectoryMappings">
-      <mapping directory="" vcs={vcsName} />
+      <mapping directory="" vcs={vcs.name} />
     </component>
 
   def save() {
@@ -129,9 +130,9 @@ class IdeaProjectDescriptor(val projectInfo: IdeaProjectInfo, val env: IdeaProje
         "vcs.xml" -> Some(project(vcsComponent)),
         "projectCodeStyle.xml" -> Some(defaultProjectCodeStyleXml),
         "encodings.xml" -> Some(defaultEncodingsXml),
-        "scala_compiler.xml" -> (if (env.useProjectFsc) Some(scalaCompilerXml) else None),
-        "highlighting.xml" -> (if (env.enableTypeHighlighting) Some(highlightingXml) else None),
-        "workspace.xml" -> (if (env.ignoreGenerated) Some(workspaceXml) else None)
+        "scala_compiler.xml" -> (if (env.useProjectFsc) Some(project(scalaCompilerXml)) else None),
+        "highlighting.xml" -> (if (env.enableTypeHighlighting) Some(project(highlightingXml)) else None),
+        "workspace.xml" -> env.ignoreGenerated.filter(_ == IgnoreByIdea ).map(_ => project(workspaceXml))
       ) foreach {
         case (fileName, Some(xmlNode)) if (!configFile(fileName).exists) =>  saveFile(configDir, fileName, xmlNode)
         case _ =>
@@ -150,29 +151,23 @@ class IdeaProjectDescriptor(val projectInfo: IdeaProjectInfo, val env: IdeaProje
   }
 
   val scalaCompilerXml =
-    <project version="4">
-      <component name="ScalacSettings">
-        <option name="COMPILER_LIBRARY_NAME" value={projectInfo.childProjects.headOption.
-        map(p => SbtIdeaModuleMapping.toIdeaLib(p.scalaInstance).name).getOrElse("")}/>
-        <option name="COMPILER_LIBRARY_LEVEL" value="Project"/>
-      </component>
-    </project>
+    <component name="ScalacSettings">
+      <option name="COMPILER_LIBRARY_NAME" value={projectInfo.childProjects.headOption.
+      map(p => SbtIdeaModuleMapping.toIdeaLib(p.scalaInstance).name).getOrElse("")}/>
+      <option name="COMPILER_LIBRARY_LEVEL" value="Project"/>
+    </component>
 
   val highlightingXml =
-    <project version="4">
-      <component name="HighlightingAdvisor">
-        <option name="SUGGEST_TYPE_AWARE_HIGHLIGHTING" value="false"/>
-        <option name="TYPE_AWARE_HIGHLIGHTING_ENABLED" value="true"/>
-      </component>
-    </project>
+    <component name="HighlightingAdvisor">
+      <option name="SUGGEST_TYPE_AWARE_HIGHLIGHTING" value="false"/>
+      <option name="TYPE_AWARE_HIGHLIGHTING_ENABLED" value="true"/>
+    </component>
 
   val workspaceXml =
-    <project version="4">
-      <component name="ChangeListManager">
-        <ignored path=".idea/"/>
-        <ignored path=".idea_modules/"/>
-      </component>
-    </project>
+    <component name="ChangeListManager">
+      <ignored path=".idea/"/>
+      <ignored path=".idea_modules/"/>
+    </component>
 
   val defaultProjectCodeStyleXml =
     <project version="4">

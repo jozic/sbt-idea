@@ -37,8 +37,16 @@ case class IdeaProjectInfo(baseDir: File, name: String, childProjects: List[SubP
 
 case class IdeaUserEnvironment(webFacet: Boolean)
 
+sealed trait IgnoreGenerated
+
+case object IgnoreByIdea extends IgnoreGenerated
+
+case object IgnoreByVcs extends IgnoreGenerated
+
+
+
 case class IdeaProjectEnvironment(projectJdkName :String, javaLanguageLevel: String,
                                   includeSbtProjectDefinitionModule: Boolean, projectOutputPath: Option[String],
                                   excludedFolders: String, compileWithIdea: Boolean, modulePath: String, useProjectFsc: Boolean,
-                                  enableTypeHighlighting: Boolean, ignoreGenerated: Boolean)
+                                  enableTypeHighlighting: Boolean, ignoreGenerated: Option[IgnoreGenerated])
 

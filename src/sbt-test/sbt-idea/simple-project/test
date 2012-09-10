@@ -1,2 +1,2 @@
-> gen-idea
+> gen-idea ignore-generated-by-idea
 > assert-expected-xml-files

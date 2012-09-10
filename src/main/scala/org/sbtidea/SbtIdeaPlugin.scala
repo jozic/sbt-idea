@@ -4,11 +4,14 @@ import sbt._
 import sbt.Load.BuildStructure
 import sbt.CommandSupport._
 import sbt.complete.Parsers._
+import complete.Parser.{literalRichStringParser, token}
 import java.io.File
 import collection.Seq
 import SbtIdeaModuleMapping._
 import java.lang.IllegalArgumentException
 import xml.NodeSeq
+import sbt.Value
+import sbt.Configuration
 
 object SbtIdeaPlugin extends Plugin {
   val ideaProjectName = SettingKey[String]("idea-project-name")
@@ -35,9 +38,10 @@ object SbtIdeaPlugin extends Plugin {
   private val SbtClassifiers = "sbt-classifiers"
   private val NoFsc = "no-fsc"
   private val NoTypeHighlighting = "no-type-highlighting"
-  private val NoIgnoreGenerated = "no-ignore-generated"
+  private val IgnoreGeneratedByIdea = "ignore-generated-by-idea"
+  private val IgnoreGeneratedByVcs = "ignore-generated-by-vcs"
 
-  private val args = (Space ~> NoClassifiers | Space ~> SbtClassifiers | Space ~> NoFsc | Space ~> NoTypeHighlighting | Space ~> NoIgnoreGenerated).*
+  private val args = (Space ~> NoClassifiers | Space ~> SbtClassifiers | Space ~> NoFsc | Space ~> NoTypeHighlighting | Space ~> token(IgnoreGeneratedByIdea.id | IgnoreGeneratedByVcs.id)).*
 
   private lazy val ideaCommand = Command("gen-idea")(_ => args)(doCommand)
 
@@ -91,10 +95,14 @@ object SbtIdeaPlugin extends Plugin {
 
     val projectInfo = IdeaProjectInfo(buildUnit.localBase, name.getOrElse("Unknown"), subProjects, ideaLibs ::: scalaLibs)
 
+    val ignoreGenerated = if (args.contains(IgnoreGeneratedByVcs)) Some(IgnoreByVcs)
+    else if (args.contains(IgnoreGeneratedByIdea)) Some(IgnoreByIdea)
+    else None
+
     val env = IdeaProjectEnvironment(projectJdkName = SystemProps.jdkName, javaLanguageLevel = SystemProps.languageLevel,
       includeSbtProjectDefinitionModule = true, projectOutputPath = None, excludedFolders = "target",
       compileWithIdea = false, modulePath = ".idea_modules", useProjectFsc = !args.contains(NoFsc),
-      enableTypeHighlighting = !args.contains(NoTypeHighlighting), ignoreGenerated = !args.contains(NoIgnoreGenerated))
+      enableTypeHighlighting = !args.contains(NoTypeHighlighting), ignoreGenerated = ignoreGenerated)
 
     val userEnv = IdeaUserEnvironment(false)
 
@@ -135,6 +143,10 @@ object SbtIdeaPlugin extends Plugin {
          buildDefinitionDir, sbtScalaVersion, sbtVersion, sbtOut, buildUnit.classpath, sbtModuleSourceFiles, logger(state))
         sbtDef.save()
       }
+    }
+
+    for (value <- ignoreGenerated if value == IgnoreByVcs) {
+      rootFiles.vcs.ignore(logger(state))
     }
 
     state
