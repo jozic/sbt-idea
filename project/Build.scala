@@ -25,7 +25,7 @@ object SbtIdeaBuild extends Build {
   )
 
   private def scriptedTestHelperDependencies = Seq(
-    "commons-io" % "commons-io" % "2.0.1"
+    "commons-io" % "commons-io" % "2.2"
   )
 
   def extraPom = (
