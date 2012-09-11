@@ -9,25 +9,38 @@ import collection.JavaConverters._
 import xml.transform.{RewriteRule, RuleTransformer}
 import xml.Node
 import org.sbtidea.SystemProps
+import org.apache.commons.io.FileUtils
 
 abstract class AbstractScriptedTestBuild(projectName : String) extends Build {
   import XmlAttributesCopy._
   lazy val assertExpectedXmlFiles = TaskKey[Unit]("assert-expected-xml-files")
+  lazy val assertExpectedFiles = TaskKey[Unit]("assert-expected-files")
 
-	lazy val scriptedTestSettings = Seq(assertExpectedXmlFiles := assertXmlsTask)
+	lazy val scriptedTestSettings = Seq(assertExpectedXmlFiles := assertXmlsTask, assertExpectedFiles := assertFilesTask)
 
-  private def assertXmlsTask {
+  private def assertXmlsTask() {
+    assertTask(assertExpectedXml)
+  }
+
+  private def assertFilesTask() {
+    assertTask(assertExpectedFile)
+  }
+
+  private def assertTask(f: (File, File)=> Option[String]) {
     val expectedFiles = listFiles(file("."), Array("expected"), true).asScala
-    expectedFiles.map(assertExpectedXml).foldLeft[Option[String]](None) {
+    expectedFiles.map(file => assertExpected(file, f)).foldLeft[Option[String]](None) {
       (acc, fileResult) => if (acc.isDefined) acc else fileResult
     } foreach sys.error
   }
 
-  private def assertExpectedXml(expectedFile: File):Option[String] = {
+  private def assertExpected(expectedFile: File, f: (File, File)=> Option[String]):Option[String] = {
     val actualFile = new File(removeExtension(expectedFile.getAbsolutePath))
-    if (actualFile.exists) assertExpectedXml(expectedFile, actualFile)
+    if (actualFile.exists) f(expectedFile, actualFile)
     else Some("Expected file " + actualFile.getAbsolutePath + " does not exist.")
   }
+
+  private def assertExpectedFile(expectedFile: File, actualFile: File): Option[String] =
+    if (FileUtils.contentEqualsIgnoreEOL(expectedFile, actualFile, null)) None else Some(formatErrorMessage(expectedFile, actualFile))
 
   private def assertExpectedXml(expectedFile: File, actualFile: File): Option[String] = {
     /* Make generated files OS independent and strip the suffix that is randomly generated from content url so that comparisons can work */
@@ -67,13 +80,26 @@ abstract class AbstractScriptedTestBuild(projectName : String) extends Build {
 
   private def formatErrorMessage(actualFile: File, actualXml: Node, expectedXml: Node): String = {
     val pp = new PrettyPrinter(1000, 2)
+    formatErrorMessage(actualFile.getName,
+      addExpected = b => pp.format(expectedXml, b),
+      addActual = b => pp.format(actualXml, b))
+  }
+
+  private def formatErrorMessage(expectedFile: File, actualFile: File): String =
+    formatErrorMessage(actualFile.getName,
+      addExpected = b => b.append(IO.read(expectedFile)),
+      addActual = b => b.append(IO.read(actualFile)))
+
+  private def formatErrorMessage(actualFileName: String,
+                                 addExpected: StringBuilder => Unit,
+                                 addActual: StringBuilder => Unit): String = {
     val msg = new StringBuilder
-    msg.append("Xml file " + actualFile.getName + " does not equal expected:")
+    msg.append("File " + actualFileName + " does not equal expected:")
     msg.append("\n********** Expected **********\n ")
-    pp.format(expectedXml, msg)
+    addExpected(msg)
     msg.append("\n*********** Actual ***********\n ")
-    pp.format(actualXml, msg)
-    msg.toString
+    addActual(msg)
+    msg.toString()
   }
 
   object XmlAttributesCopy {

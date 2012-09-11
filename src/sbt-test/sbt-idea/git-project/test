@@ -1,0 +1,3 @@
+$ mkdir .git
+> gen-idea ignore-generated-by-vcs
+> assert-expected-files
